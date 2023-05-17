@@ -95,7 +95,7 @@ module ActiveForm
           load_target
           concat_records(records)
         else
-          transaction { concat_records(records) }
+          concat_records(records)
         end
       end
 
