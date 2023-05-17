@@ -455,22 +455,21 @@ module ActiveForm
           unless reject_new_record?(association_name, attributes)
             association.reader.build(attributes.except(*UNASSIGNABLE_KEYS))
           end
-        elsif existing_record = existing_records.detect { |record| record.id.to_s == attributes["id"].to_s }
+        else
           unless call_reject_if(association_name, attributes)
             # Make sure we are operating on the actual object which is in the association's
             # proxy_target array (either by finding it, or adding it if not found)
             # Take into account that the proxy_target may have changed due to callbacks
             target_record = association.target.detect { |record| record.id.to_s == attributes["id"].to_s }
             if target_record
-              existing_record = target_record
+              existing_record = association.reader.build(attributes.except(*UNASSIGNABLE_KEYS))
             else
+              existing_record = association.reader.build(attributes)
               association.add_to_target(existing_record, skip_callbacks: true)
             end
 
             assign_to_or_mark_for_destruction(existing_record, attributes, options[:allow_destroy])
           end
-        else
-          raise_nested_attributes_record_not_found!(association_name, attributes["id"])
         end
       end
     end
@@ -502,13 +501,13 @@ module ActiveForm
     # Updates a record with the +attributes+ or marks it for destruction if
     # +allow_destroy+ is +true+ and has_destroy_flag? returns +true+.
     def assign_to_or_mark_for_destruction(record, attributes, allow_destroy)
-      record.assign_attributes(attributes.except(*UNASSIGNABLE_KEYS))
+      record.assign_attributes(attributes)
       record.mark_for_destruction if has_destroy_flag?(attributes) && allow_destroy
     end
 
     # Determines if a hash contains a truthy _destroy key.
     def has_destroy_flag?(hash)
-      Type::Boolean.new.cast(hash["_destroy"])
+      ::ActiveModel::Type::Boolean.new.cast(hash['destroy'])
     end
 
     # Determines if a new record should be rejected by checking
