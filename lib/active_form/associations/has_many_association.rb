@@ -80,7 +80,7 @@ module ActiveForm
           loaded!
         end
 
-        [association_scope.limit_value, count].compact.min
+        [10, count].compact.min
       end
 
       def update_counter(difference, reflection = reflection())

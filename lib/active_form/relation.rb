@@ -789,7 +789,7 @@ module ActiveForm
 
     def inspect
       subject = loaded? ? records : annotate("loading for inspect")
-      entries = subject.take([limit_value, 11].compact.min).map!(&:inspect)
+      entries = subject.take([10, 11].compact.min).map!(&:inspect)
 
       entries[10] = "..." if entries.size == 11
 
@@ -801,7 +801,7 @@ module ActiveForm
     end
 
     def has_limit_or_offset? # :nodoc:
-      limit_value || offset_value
+      false
     end
 
     def alias_tracker(joins = [], aliases = nil) # :nodoc:
@@ -984,7 +984,7 @@ module ActiveForm
     end
 
     def limited_count
-      limit_value ? count : limit(2).count
+      false ? count : limit(2).count
     end
   end
 end

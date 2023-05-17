@@ -241,8 +241,8 @@ module ActiveForm
         target
       end
 
-      def add_to_target(record, skip_callbacks: false, replace: false, &block)
-        replace_on_target(record, skip_callbacks, replace: replace || association_scope.distinct_value, &block)
+      def add_to_target(record, skip_callbacks: false, replace: true, &block)
+        replace_on_target(record, skip_callbacks, replace: replace, &block)
       end
 
       def target=(record)
