@@ -4,6 +4,7 @@ require 'active_form/core'
 require 'active_form/inheritance'
 require 'active_form/reflection'
 require 'active_form/relation'
+require 'active_form/attributes'
 require 'active_form/nested_attributes'
 require 'active_form/association_relation'
 require 'active_form/associations/association'
@@ -19,14 +20,15 @@ require 'active_form/associations/builder/has_one'
 require 'active_form/associations/builder/has_many'
 require 'active_form/associations/has_many_association'
 require 'active_form/associations/has_one_association'
-require 'active_form/associations/builder'
-require "active_form/associations/collection_proxy"
 
 require 'active_form/acts_like_model'
+require 'active_form/from_model'
 require 'active_form/from_params'
 
 module ActiveForm
   class ActiveFormError < StandardError
+  end
+  class AssociationTypeMismatch < ActiveFormError
   end
 
   class Base
@@ -39,6 +41,8 @@ module ActiveForm
     include ActiveModel::Callbacks
     include ActiveModel::Dirty
     extend  Relation::Delegation::DelegateCache
+    include ActiveForm::Attributes
+
     include ActiveForm::Core
     include ActiveForm::Inheritance
     include ActiveForm::Reflection
@@ -46,23 +50,7 @@ module ActiveForm
 
     include ActiveForm::ActsLikeModel
     include ActiveForm::FromParams
-
-    def attribute_present?(attr_name)
-      attr_name = attr_name.to_s
-      attr_name = self.class.attribute_aliases[attr_name] || attr_name
-      value = _read_attribute(attr_name)
-      !value.nil? && !(value.respond_to?(:empty?) && value.empty?)
-    end
-
-    class_attribute :inheritance_column, default: :form_type
-
-    def self._has_attribute?(name)
-      attribute_types.key?(name.to_s)
-    end
-
-    def _has_attribute?(name)
-      attributes.key?(name)
-    end
+    include FromModel
 
     def init_internals
       @readonly                 = false
@@ -97,10 +85,13 @@ module ActiveForm
       _run_initialize_callbacks
     end
 
+    class_attribute :inheritance_column, default: :form_type
+
     define_model_callbacks :initialize, only: [:after]
-    define_model_callbacks :validation, only: [:before]
+    define_model_callbacks :validation, only: [:before, :after]
 
     attribute :id, :integer
+    attribute :_destroy, :boolean
 
     class_attribute :model
     class_attribute :primary_key, default: "id"
@@ -111,6 +102,11 @@ module ActiveForm
 
     def with_context(contexts = {})
       @context = OpenStruct.new(contexts)
+      _reflections.each do |_, reflection|
+        if instance = public_send(reflection.name)
+          instance.with_context(@context)
+        end
+      end
       self
     end
 
@@ -136,8 +132,9 @@ module ActiveForm
       id.present? && id.to_i.positive?
     end
 
-    def attributes
-      super.except('id')
+    def self.from_json(json)
+      params = JSON.parse(json)
+      from_params(params)
     end
 
     def valid?(options = {})
@@ -164,7 +161,11 @@ module ActiveForm
       elsif model.present?
         ActiveModel::Name.new(self, nil, model.model_name.name.split('::').last)
       else
-        ActiveModel::Name.new(self, nil, name.split('::').last)
+        name = self.name.demodulize.delete_suffix("Form")
+        if name.blank?
+          name = self.name
+        end
+        ActiveModel::Name.new(self, nil, name)
       end
     end
 
@@ -172,31 +173,20 @@ module ActiveForm
       self.class.model_name
     end
 
-    def merge_errors!(other)
-      other.errors.each do |error|
-        if self.attributes.include?(error.attribute.to_s)
-          self.errors.add(error.attribute, error.message)
-        end
-      end
-      self
-    end
-
     def new_record?
       !persisted?
     end
 
-    def type_for_attribute(attr)
-      self.class.attribute_types[attr].type
+    def self.distinct_value
+      true
     end
 
-    def column_for_attribute(attr)
-      model.column_for_attribute(attr)
+    def marked_for_destruction?
+      attributes['_destroy']
     end
 
-    def has_attribute?(attr_name)
-      attr_name = attr_name.to_s
-      attr_name = self.class.attribute_aliases[attr_name] || attr_name
-      @attributes.key?(attr_name)
+    def destroy?
+      _destroy
     end
   end
 end

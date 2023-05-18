@@ -47,11 +47,13 @@ module ActiveForm
       def has_many(name, scope = nil, **options, &extension)
         reflection = Builder::HasMany.build(self, name, scope, options, &extension)
         Reflection.add_reflection self, name, reflection
+        accepts_nested_attributes_for name
       end
 
       def has_one(name, scope = nil, **options)
         reflection = Builder::HasOne.build(self, name, scope, options)
         Reflection.add_reflection self, name, reflection
+        accepts_nested_attributes_for name
       end
     end
   end

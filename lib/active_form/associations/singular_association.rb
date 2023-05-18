@@ -14,6 +14,9 @@ module ActiveForm
 
       # Implements the writer method, e.g. foo.bar= for Foo.belongs_to :bar
       def writer(record)
+        unless record.class < ActiveForm::Base
+          record = build_record(record)
+        end
         replace(record)
       end
 

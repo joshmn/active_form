@@ -22,7 +22,6 @@ module ActiveForm
         return if options[:through]
 
         return
-        binding.pry
         key = owner.send(:_read_attribute, reflection.join_foreign_key)
         record._write_attribute(reflection.join_primary_key, key)
 

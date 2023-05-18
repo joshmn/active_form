@@ -9,6 +9,75 @@ module ActiveForm
       class_attribute :nested_attributes_options, instance_writer: false, default: {}
     end
 
+    def associated_records_to_validate_or_save(association, new_record, autosave)
+      if new_record
+        association && association.target
+      elsif autosave
+        association.target.find_all(&:changed_for_autosave?)
+      else
+        association.target.find_all(&:new_record?)
+      end
+    end
+
+    # Validate the association if <tt>:validate</tt> or <tt>:autosave</tt> is
+    # turned on for the association.
+    def validate_single_association(reflection)
+      association = association_instance_get(reflection.name)
+      record      = association && association.reader
+      association_valid?(reflection, record) if record && (record.changed_for_autosave?)
+    end
+
+    # Validate the associated records if <tt>:validate</tt> or
+    # <tt>:autosave</tt> is turned on for the association specified by
+    # +reflection+.
+    def validate_collection_association(reflection)
+      if association = association_instance_get(reflection.name)
+        if records = associated_records_to_validate_or_save(association, new_record?, reflection.options[:autosave])
+          records.each_with_index { |record, index| association_valid?(reflection, record, index) }
+        end
+      end
+    end
+
+    # Returns whether or not the association is valid and applies any errors to
+    # the parent, <tt>self</tt>, if it wasn't. Skips any <tt>:autosave</tt>
+    # enabled records if they're marked_for_destruction? or destroyed.
+    def association_valid?(reflection, record, index = nil)
+      context = nil
+
+      unless valid = record.valid?(context)
+        if reflection.options[:autosave]
+          indexed_attribute = !index.nil? && (reflection.options[:index_errors])
+
+          record.errors.group_by_attribute.each { |attribute, errors|
+            attribute = normalize_reflection_attribute(indexed_attribute, reflection, index, attribute)
+
+            errors.each { |error|
+              self.errors.import(
+                error,
+                attribute: attribute
+              )
+            }
+          }
+        else
+          errors.add(reflection.name)
+        end
+      end
+      valid
+    end
+
+    def normalize_reflection_attribute(indexed_attribute, reflection, index, attribute)
+      if indexed_attribute
+        "#{reflection.name}[#{index}].#{attribute}"
+      else
+        "#{reflection.name}.#{attribute}"
+      end
+    end
+
+    def _ensure_no_duplicate_errors
+      errors.uniq!
+    end
+
+
     # = Active Record Nested \Attributes
     #
     # Nested attributes allow you to save attributes on associated records
@@ -355,6 +424,7 @@ module ActiveForm
             nested_attributes_options = self.nested_attributes_options.dup
             nested_attributes_options[association_name.to_sym] = options
             self.nested_attributes_options = nested_attributes_options
+            define_validation_callbacks(reflection)
 
             type = (reflection.collection? ? :collection : :one_to_one)
             generate_association_writer(association_name, type)
@@ -365,6 +435,41 @@ module ActiveForm
       end
 
       private
+
+      def define_validation_callbacks(reflection)
+        validation_method = :"validate_associated_records_for_#{reflection.name}"
+        if reflection.validate? && !method_defined?(validation_method)
+          if reflection.collection?
+            method = :validate_collection_association
+          else
+            method = :validate_single_association
+          end
+
+          define_non_cyclic_method(validation_method) { send(method, reflection) }
+          validate validation_method
+          after_validation :_ensure_no_duplicate_errors
+        end
+      end
+
+
+      def define_non_cyclic_method(name, &block)
+        return if method_defined?(name, false)
+
+        define_method(name) do |*args|
+          result = true; @_already_called ||= {}
+          # Loop prevention for validation of associations
+          unless @_already_called[name]
+            begin
+              @_already_called[name] = true
+              result = instance_eval(&block)
+            ensure
+              @_already_called[name] = false
+            end
+          end
+
+          result
+        end
+      end
 
       def generate_association_writer(association_name, type)
         generated_association_methods.module_eval <<-eoruby, __FILE__, __LINE__ + 1
@@ -391,8 +496,7 @@ module ActiveForm
       attributes = attributes.with_indifferent_access
       existing_record = send(association_name)
 
-      if (options[:update_only] || !attributes["id"].blank?) && existing_record &&
-        (options[:update_only] || existing_record.id.to_s == attributes["id"].to_s)
+      if (options[:update_only] || !attributes["id"].blank?) && existing_record && (options[:update_only] || existing_record.id.to_s == attributes["id"].to_s)
         assign_to_or_mark_for_destruction(existing_record, attributes, options[:allow_destroy]) unless call_reject_if(association_name, attributes)
 
       elsif attributes["id"].present?

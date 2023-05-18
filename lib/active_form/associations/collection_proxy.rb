@@ -93,6 +93,9 @@ module ActiveForm
       end
       alias_method :new, :build
 
+      def with_context(context)
+        self.each { |record| record.with_context(context) }
+      end
       # Returns a new object of the collection type that has been instantiated with
       # attributes, linked to this object and that has already been saved (if it
       # passes the validations).

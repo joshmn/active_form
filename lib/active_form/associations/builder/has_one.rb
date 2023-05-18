@@ -31,19 +31,19 @@ module ActiveForm
           super
           if reflection.options[:required]
             model.validates_presence_of reflection.name, message: :required
+            model.validate :"ensure_#{reflection.name}_valid!"
+
+            model.define_method "ensure_#{reflection.name}_valid!" do
+              unless public_send(reflection.name).valid?
+                self.errors.add(reflection.name, :invalid)
+              end
+            end
           end
         end
 
-        def self.touch_record(record, name, touch)
-
-        end
-
-        def self.add_touch_callbacks(model, reflection)
-
-        end
 
         private_class_method :macro, :valid_options, :valid_dependent_options, :add_destroy_callbacks,
-                             :define_callbacks, :define_validations, :add_touch_callbacks
+                             :define_callbacks, :define_validations
       end
     end
   end

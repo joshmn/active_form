@@ -13,40 +13,8 @@ module ActiveForm
         @proxy.reset_scope
       end
 
-      # Implements the writer method, e.g. foo.items= for Foo.has_many :items
       def writer(records)
         replace(records)
-      end
-
-      # Implements the ids reader method, e.g. foo.item_ids for Foo.has_many :items
-      def ids_reader
-        if loaded?
-          target.pluck(reflection.association_primary_key)
-        elsif !target.empty?
-          load_target.pluck(reflection.association_primary_key)
-        else
-          @association_ids ||= scope.pluck(reflection.association_primary_key)
-        end
-      end
-
-      # Implements the ids writer method, e.g. foo.item_ids= for Foo.has_many :items
-      def ids_writer(ids)
-        primary_key = reflection.association_primary_key
-        pk_type = klass.type_for_attribute(primary_key)
-        ids = Array(ids).compact_blank
-        ids.map! { |i| pk_type.cast(i) }
-
-        records = klass.where(primary_key => ids).index_by do |r|
-          r.public_send(primary_key)
-        end.values_at(*ids).compact
-
-        if records.size != ids.size
-          found_ids = records.map { |record| record.public_send(primary_key) }
-          not_found_ids = ids - found_ids
-          klass.all.raise_record_not_found_exception!(ids, records.size, ids.size, primary_key, not_found_ids)
-        else
-          replace(records)
-        end
       end
 
       def reset
@@ -205,6 +173,13 @@ module ActiveForm
       # Replace this collection with +other_array+. This will perform a diff
       # and delete/add only records that have changed.
       def replace(other_array)
+        other_array = other_array.map do |other|
+          if other.class < ActiveForm::Base
+            other
+          else
+            build_record(other)
+          end
+        end
         other_array.each { |val| raise_on_type_mismatch!(val) }
         original_target = load_target.dup
 

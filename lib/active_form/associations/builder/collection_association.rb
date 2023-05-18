@@ -52,17 +52,6 @@ module ActiveForm
           model.send "#{full_callback_name}=", callbacks
         end
 
-        # Defines the setter and getter methods for the collection_singular_ids.
-        def self.define_readers(mixin, name)
-          super
-
-          mixin.class_eval <<-CODE, __FILE__, __LINE__ + 1
-        def #{name.to_s.singularize}_ids
-          association(:#{name}).ids_reader
-        end
-          CODE
-        end
-
         def self.define_writers(mixin, name)
           super
 
