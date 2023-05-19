@@ -512,4 +512,22 @@ RSpec.describe ActiveForm::Base do
       expect(form.contacts.first.context.account_id).to eq(1)
     end
   end
+
+  context 'errors' do
+    class FakeTwoForm < ActiveForm::Base
+      attribute :name
+
+      validates :name, presence: true
+    end
+
+    class FakeOneForm < ActiveForm::Base
+      has_many :fake_twos
+    end
+
+    it 'parents are invalid if children are invalid' do
+      instance = FakeOneForm.new
+      instance.fake_twos.new
+      expect(instance.valid?).to be_falsey
+    end
+  end
 end

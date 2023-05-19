@@ -10,6 +10,10 @@ describe 'HasOne' do
     attribute :name
   end
 
+  class HumanForm < ActiveForm::Base
+
+  end
+
   it 'is reflected' do
     expect(TicketForm._reflections).to include('customer')
   end
@@ -31,6 +35,13 @@ describe 'HasOne' do
     it 'works' do
       instance = TicketForm.from_params({customer_attributes: { name: "bob"}})
       expect(instance.customer.name).to eq("bob")
+    end
+  end
+
+  context 'derived class name' do
+    it 'appends form' do
+      HumanForm.has_many :tickets
+      expect(HumanForm.new.association(:tickets).klass).to eq(TicketForm)
     end
   end
 end

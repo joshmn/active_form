@@ -336,15 +336,15 @@ module ActiveForm
       # <tt>has_many :clients</tt> returns <tt>{}</tt>
       attr_reader :options
 
-      attr_reader :active_record
+      attr_reader :active_form
 
       attr_reader :plural_name # :nodoc:
 
-      def initialize(name, scope, options, active_record)
+      def initialize(name, scope, options, active_form)
         @name          = name
         @scope         = scope
         @options       = options
-        @active_record = active_record
+        @active_form = active_form
         @klass         = options[:anonymous_class]
       end
 
@@ -379,14 +379,14 @@ module ActiveForm
         name.constantize
       end
 
-      # Returns +true+ if +self+ and +other_aggregation+ have the same +name+ attribute, +active_record+ attribute,
+      # Returns +true+ if +self+ and +other_aggregation+ have the same +name+ attribute, +active_form+ attribute,
       # and +other_aggregation+ has an options hash assigned to it.
       def ==(other_aggregation)
         super ||
           other_aggregation.kind_of?(self.class) &&
             name == other_aggregation.name &&
             !other_aggregation.options.nil? &&
-            active_record == other_aggregation.active_record
+            active_form == other_aggregation.active_form
       end
 
       def scope_for(relation, owner = nil)
@@ -395,7 +395,7 @@ module ActiveForm
 
       private
       def derive_class_name
-        name.to_s.camelize
+        "#{name.to_s.camelize}Form"
       end
     end
 
@@ -417,13 +417,13 @@ module ActiveForm
         end
 
         msg = <<-MSG.squish
-          Rails couldn't find a valid model for #{name} association.
+          ActiveForm couldn't find a valid form for #{name} association.
           Please provide the :class_name option on the association declaration.
-          If :class_name is already provided, make sure it's an ActiveRecord::Base subclass.
+          If :class_name is already provided, make sure it's an ActiveForm::Base subclass.
         MSG
 
         begin
-          klass = active_record.send(:compute_type, name)
+          klass = active_form.send(:compute_type, name)
 
           unless klass < ActiveForm::Base
             raise ArgumentError, msg
@@ -438,7 +438,7 @@ module ActiveForm
       attr_reader :type, :foreign_type
       attr_accessor :parent_reflection # Reflection
 
-      def initialize(name, scope, options, active_record)
+      def initialize(name, scope, options, active_form)
         super
         @type = -(options[:foreign_type]&.to_s || "#{options[:as]}_type") if options[:as]
         @foreign_type = -(options[:foreign_type]&.to_s || "#{name}_type") if options[:polymorphic]
@@ -612,7 +612,7 @@ module ActiveForm
       # returns either +nil+ or the inverse association name that it finds.
       def automatic_inverse_of
         if can_find_inverse_of_automatically?(self)
-          inverse_name = ActiveSupport::Inflector.underscore(options[:as] || active_record.name.demodulize).to_sym
+          inverse_name = ActiveSupport::Inflector.underscore(options[:as] || active_form.name.demodulize).to_sym
 
           begin
             reflection = klass._reflect_on_association(inverse_name)
@@ -679,12 +679,12 @@ module ActiveForm
         elsif options[:as]
           "#{options[:as]}_id"
         else
-          active_record.model_name.to_s.foreign_key
+          active_form.model_name.to_s.foreign_key
         end
       end
 
       def derive_join_table
-        ModelSchema.derive_join_table_name active_record.table_name, klass.table_name
+        ModelSchema.derive_join_table_name active_form.table_name, klass.table_name
       end
     end
 

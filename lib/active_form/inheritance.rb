@@ -148,6 +148,7 @@ module ActiveForm
           # the type_name is an absolute reference.
           type_name.constantize
         else
+
           type_candidate = @_type_candidates_cache[type_name]
           if type_candidate && type_constant = type_candidate.safe_constantize
             return type_constant
@@ -155,8 +156,16 @@ module ActiveForm
 
           # Build a list of candidates to search for
           candidates = []
-          name.scan(/::|$/) { candidates.unshift "#{$`}::#{type_name}" }
+          name.scan(/::|$/) { candidates.unshift "#{$`}::#{type_name}";  }
           candidates << type_name
+          form_candidates = []
+          candidates.each do |candidate|
+            next if candidate.end_with?("Form")
+
+            form_candidates << "#{candidate}Form"
+          end
+
+          candidates += form_candidates
 
           candidates.each do |candidate|
             constant = candidate.safe_constantize

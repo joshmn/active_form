@@ -9,13 +9,11 @@ module ActiveForm
       class_attribute :nested_attributes_options, instance_writer: false, default: {}
     end
 
-    def associated_records_to_validate_or_save(association, new_record, autosave)
+    def associated_records_to_validate(association, new_record)
       if new_record
         association && association.target
-      elsif autosave
-        association.target.find_all(&:changed_for_autosave?)
       else
-        association.target.find_all(&:new_record?)
+        association.target.all
       end
     end
 
@@ -24,7 +22,7 @@ module ActiveForm
     def validate_single_association(reflection)
       association = association_instance_get(reflection.name)
       record      = association && association.reader
-      association_valid?(reflection, record) if record && (record.changed_for_autosave?)
+      association_valid?(reflection, record) if record
     end
 
     # Validate the associated records if <tt>:validate</tt> or
@@ -32,7 +30,7 @@ module ActiveForm
     # +reflection+.
     def validate_collection_association(reflection)
       if association = association_instance_get(reflection.name)
-        if records = associated_records_to_validate_or_save(association, new_record?, reflection.options[:autosave])
+        if records = associated_records_to_validate(association, new_record?)
           records.each_with_index { |record, index| association_valid?(reflection, record, index) }
         end
       end
@@ -45,22 +43,18 @@ module ActiveForm
       context = nil
 
       unless valid = record.valid?(context)
-        if reflection.options[:autosave]
-          indexed_attribute = !index.nil? && (reflection.options[:index_errors])
+        indexed_attribute = !index.nil? && (reflection.options[:index_errors])
 
-          record.errors.group_by_attribute.each { |attribute, errors|
-            attribute = normalize_reflection_attribute(indexed_attribute, reflection, index, attribute)
+        record.errors.group_by_attribute.each { |attribute, errors|
+          attribute = normalize_reflection_attribute(indexed_attribute, reflection, index, attribute)
 
-            errors.each { |error|
-              self.errors.import(
-                error,
-                attribute: attribute
-              )
-            }
+          errors.each { |error|
+            self.errors.import(
+              error,
+              attribute: attribute
+            )
           }
-        else
-          errors.add(reflection.name)
-        end
+        }
       end
       valid
     end

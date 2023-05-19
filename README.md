@@ -44,3 +44,47 @@ class TicketForm < ActiveForm::Base
   validates :name, presence: true  
 end
 ```
+
+### Context
+
+Add context:
+
+```ruby
+class OrganizationForm < ActiveForm::Base 
+  acts_like_model :organization 
+  
+  attribute :location_id, :integer 
+  
+  def location_id_options
+    context.organization.locations
+  end
+end
+```
+
+```ruby
+form = OrganizationForm.new
+form.with_context(organization: @organization)
+```
+
+Context gets passed down to all associations too.
+
+```ruby
+class OrganizationForm < ActiveForm::Base 
+  acts_like_model :organization 
+  
+  has_many :users, class_name: "UserForm"
+  
+  attribute :location_id, :integer 
+  
+  def location_id_options
+    context.organization.locations
+  end
+end
+```
+
+```ruby
+form = OrganizationForm.new 
+form.with_context(organization: @organization)
+user = form.users.new
+user.context == form.context 
+```
