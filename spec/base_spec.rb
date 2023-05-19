@@ -530,4 +530,31 @@ RSpec.describe ActiveForm::Base do
       expect(instance.valid?).to be_falsey
     end
   end
+
+  context 'weird has one edgecase' do
+    class FakeTwoForm < ActiveForm::Base
+      attribute :name
+
+      validates :name, presence: true
+    end
+
+    class FakeOneForm < ActiveForm::Base
+      has_one :fake_two
+    end
+
+    it 'works' do
+      instance = FakeOneForm.new
+      instance.fake_two = instance.build_fake_two(name: "hi")
+      expect(instance.fake_two).to be_a(FakeTwoForm)
+      expect(instance.fake_two.name).to eq('hi')
+    end
+
+
+    it 'still works' do
+      instance = FakeOneForm.new
+      instance.build_fake_two(name: "hi")
+      expect(instance.fake_two).to be_a(FakeTwoForm)
+      expect(instance.fake_two.name).to eq('hi')
+    end
+  end
 end

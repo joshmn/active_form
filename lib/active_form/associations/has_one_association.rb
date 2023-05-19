@@ -54,23 +54,6 @@ module ActiveForm
         return target unless load_target || record
 
         assigning_another_record = target != record
-        if assigning_another_record || record.has_changes_to_save?
-          save &&= owner.persisted?
-
-          transaction_if(save) do
-            remove_target!(options[:dependent]) if target && !target.destroyed? && assigning_another_record
-
-            if record
-              set_owner_attributes(record)
-              set_inverse_instance(record)
-
-              if save
-                nullify_owner_attributes(record)
-                set_owner_attributes(target) if target
-              end
-            end
-          end
-        end
 
         self.target = record
       end
