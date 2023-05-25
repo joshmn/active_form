@@ -24,29 +24,6 @@ module ActiveForm
         @association_ids = nil
       end
 
-      def find(*args)
-        if options[:inverse_of] && loaded?
-          args_flatten = args.flatten
-          model = scope.klass
-
-          if args_flatten.blank?
-            error_message = "Couldn't find #{model.name} without an ID"
-            raise RecordNotFound.new(error_message, model.name, model.primary_key, args)
-          end
-
-          result = find_by_scan(*args)
-
-          result_size = Array(result).size
-          if !result || result_size != args_flatten.size
-            scope.raise_record_not_found_exception!(args_flatten, result_size, args_flatten.size)
-          else
-            result
-          end
-        else
-          scope.find(*args)
-        end
-      end
-
       def build(attributes = nil, &block)
         if attributes.is_a?(Array)
           attributes.collect { |attr| build(attr, &block) }
@@ -65,68 +42,6 @@ module ActiveForm
         else
           concat_records(records)
         end
-      end
-
-      # Removes all records from the association without calling callbacks
-      # on the associated records. It honors the +:dependent+ option. However
-      # if the +:dependent+ value is +:destroy+ then in that case the +:delete_all+
-      # deletion strategy for the association is applied.
-      #
-      # You can force a particular deletion strategy by passing a parameter.
-      #
-      # Example:
-      #
-      # @author.books.delete_all(:nullify)
-      # @author.books.delete_all(:delete_all)
-      #
-      # See delete for more info.
-      def delete_all(dependent = nil)
-        if dependent && ![:nullify, :delete_all].include?(dependent)
-          raise ArgumentError, "Valid values are :nullify or :delete_all"
-        end
-
-        dependent = if dependent
-                      dependent
-                    elsif options[:dependent] == :destroy
-                      :delete_all
-                    else
-                      options[:dependent]
-                    end
-
-        delete_or_nullify_all_records(dependent).tap do
-          reset
-          loaded!
-        end
-      end
-
-      # Destroy all the records from this association.
-      #
-      # See destroy for more info.
-      def destroy_all
-        destroy(load_target).tap do
-          reset
-          loaded!
-        end
-      end
-
-      # Removes +records+ from this association calling +before_remove+ and
-      # +after_remove+ callbacks.
-      #
-      # This method is abstract in the sense that +delete_records+ has to be
-      # provided by descendants. Note this method does not imply the records
-      # are actually removed from the database, that depends precisely on
-      # +delete_records+. They are in any case removed from the collection.
-      def delete(*records)
-        delete_or_destroy(records, options[:dependent])
-      end
-
-      # Deletes the +records+ and removes them from this association calling
-      # +before_remove+, +after_remove+, +before_destroy+ and +after_destroy+ callbacks.
-      #
-      # Note that this method removes records from the database ignoring the
-      # +:dependent+ option.
-      def destroy(*records)
-        delete_or_destroy(records, :destroy)
       end
 
       # Returns the size of the collection by executing a SELECT COUNT(*)
@@ -252,9 +167,7 @@ module ActiveForm
       end
 
       private
-      def transaction(&block)
-        reflection.klass.transaction(&block)
-      end
+
 
       # We have some records loaded from the database (persisted) and some that are
       # in-memory (memory). The same record may be represented in the persisted array
@@ -297,9 +210,7 @@ module ActiveForm
           transaction do
             result = nil
             add_to_target(record) do
-              result = insert_record(record, true, raise) {
-                @_was_loaded = loaded?
-              }
+
             end
             raise ActiveRecord::Rollback unless result
           end
@@ -350,7 +261,6 @@ module ActiveForm
       end
 
       def replace_records(new_target, original_target)
-        delete(difference(target, new_target))
 
         unless concat(difference(new_target, target))
           @target = original_target

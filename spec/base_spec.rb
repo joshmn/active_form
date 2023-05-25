@@ -557,4 +557,20 @@ RSpec.describe ActiveForm::Base do
       expect(instance.fake_two.name).to eq('hi')
     end
   end
+
+  context 'has many does not has_many itself' do
+    class HasManyOneForm < ActiveForm::Base
+      has_many :has_many_two
+    end
+
+    class HasManyTwoForm < ActiveForm::Base
+    end
+
+    it 'works' do
+      instance = HasManyOneForm.new
+      expect(instance._reflections["has_many_two"].klass._reflections).to be_empty
+
+    end
+
+  end
 end
