@@ -13,7 +13,7 @@ module ActiveForm
       if new_record
         association && association.target
       else
-        association.target.all
+        association.target
       end
     end
 
